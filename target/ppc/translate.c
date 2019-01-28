@@ -6763,6 +6763,18 @@ static void gen_dform3D(DisasContext *ctx)
     return gen_invalid(ctx);
 }
 
+
+void helper_afl(CPUPPCState *env) 
+{
+    printf("afl instruction called, pc:" TARGET_FMT_lx ", r0: " TARGET_FMT_lx  "\n",env->nip,env->gpr[0]);
+}
+
+/* handle AFL opcode */
+static void gen_afl(DisasContext *ctx)
+{
+    gen_helper_afl(cpu_env);
+}
+
 static opcode_t opcodes[] = {
 GEN_HANDLER(invalid, 0x00, 0x00, 0x00, 0xFFFFFFFF, PPC_NONE),
 GEN_HANDLER(cmp, 0x1F, 0x00, 0x00, 0x00400000, PPC_INTEGER),
@@ -7374,6 +7386,9 @@ GEN_HANDLER2_E(trechkpt, "trechkpt", 0x1F, 0x0E, 0x1F, 0x03FFF800, \
 #include "translate/dfp-ops.inc.c"
 
 #include "translate/spe-ops.inc.c"
+
+/* instruction 0x7FFFFFFF */
+GEN_HANDLER(afl, 0x01, 0x00, 0x00, 0x00000000, PPC_INTEGER),
 };
 
 #include "helper_regs.h"

@@ -814,3 +814,5 @@ DEF_HELPER_FLAGS_5(stq_be_parallel, TCG_CALL_NO_WG,
 DEF_HELPER_5(stqcx_le_parallel, i32, env, tl, i64, i64, i32)
 DEF_HELPER_5(stqcx_be_parallel, i32, env, tl, i64, i64, i32)
 #endif
+
+DEF_HELPER_1(afl, void, env)
