@@ -134,6 +134,10 @@ int main(int argc, char **argv)
 
 #define MAX_VIRTIO_CONSOLES 1
 
+extern const char *aflFile;
+extern unsigned long aflPanicAddr;
+extern unsigned long aflDmesgAddr;
+
 static const char *data_dir[16];
 static int data_dir_idx;
 const char *bios_name = NULL;
@@ -3285,6 +3289,15 @@ int main(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 break;
+            case QEMU_OPTION_aflFile:
+                aflFile = (char *)optarg;
+                break;
+            case QEMU_OPTION_aflPanicAddr:
+                aflPanicAddr = strtoul(optarg, NULL, 16);
+                break;
+            case QEMU_OPTION_aflDmesgAddr:
+                aflDmesgAddr = strtoul(optarg, NULL, 16);
+break;
 #ifdef CONFIG_LIBISCSI
             case QEMU_OPTION_iscsi:
                 opts = qemu_opts_parse_noisily(qemu_find_opts("iscsi"),

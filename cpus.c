@@ -53,8 +53,8 @@
 #include "hw/nmi.h"
 #include "sysemu/replay.h"
 #include "hw/boards.h"
-//#include "afl.h"
-#include "afl-qemu-cpu-inl.h"
+#include "afl.h"
+//#include "afl-qemu-cpu-inl.h"
 
 #ifdef CONFIG_LINUX
 
@@ -2529,8 +2529,7 @@ gotPipeNotification(void *ctx)
     afl_setup();
     env = NULL; //XXX for now.. if we want to share JIT to the parent we will need to pass in a real env here
     //env = restart_cpu->env_ptr;
-    //afl_forkserver(env);
-    fork();
+    afl_forkserver(env);
 
     /* we're now in the child! */
     if(aflEnableTicks) // re-enable ticks only if asked to
