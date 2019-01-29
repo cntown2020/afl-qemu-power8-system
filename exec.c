@@ -2227,7 +2227,8 @@ static void ram_block_add(RAMBlock *new_block, Error **errp, bool shared)
         qemu_ram_setup_dump(new_block->host, new_block->max_length);
         qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_HUGEPAGE);
         /* MADV_DONTFORK is also needed by KVM in absence of synchronous MMU */
-        qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_DONTFORK);
+        // but we can't allow setting that if we actually want to fork~
+      //  qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_DONTFORK);
         ram_block_notify_add(new_block->host, new_block->max_length);
     }
 }

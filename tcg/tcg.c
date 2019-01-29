@@ -57,6 +57,8 @@
 # define ELF_DATA   ELFDATA2LSB
 #endif
 
+# define MAXCPUSHACK 4
+
 #include "elf.h"
 #include "exec/log.h"
 #include "sysemu/sysemu.h"
@@ -599,9 +601,9 @@ static size_t tcg_n_regions(void)
     size_t i;
 
     /* Use a single region if all we have is one vCPU thread */
-    if (max_cpus == 1 || !qemu_tcg_mttcg_enabled()) {
+/*    if (max_cpus == 1 || !qemu_tcg_mttcg_enabled()) {
         return 1;
-    }
+    } */
 
     /* Try to have more regions than max_cpus, with each region being >= 2 MB */
     for (i = 8; i > 0; i--) {
@@ -609,14 +611,14 @@ static size_t tcg_n_regions(void)
         size_t region_size;
 
         region_size = tcg_init_ctx.code_gen_buffer_size;
-        region_size /= max_cpus * regions_per_thread;
+        region_size /= MAXCPUSHACK * regions_per_thread;
 
         if (region_size >= 2 * 1024u * 1024) {
-            return max_cpus * regions_per_thread;
+            return MAXCPUSHACK * regions_per_thread;
         }
     }
     /* If we can't, then just allocate one region per vCPU thread */
-    return max_cpus;
+    return MAXCPUSHACK;
 }
 #endif
 
@@ -748,7 +750,7 @@ void tcg_register_thread(void)
 
     /* Claim an entry in tcg_ctxs */
     n = atomic_fetch_inc(&n_tcg_ctxs);
-    g_assert(n < max_cpus);
+    g_assert(n < MAXCPUSHACK);
     atomic_set(&tcg_ctxs[n], s);
 
     tcg_ctx = s;
@@ -958,7 +960,7 @@ void tcg_context_init(TCGContext *s)
     tcg_ctxs = &tcg_ctx;
     n_tcg_ctxs = 1;
 #else
-    tcg_ctxs = g_new(TCGContext *, max_cpus);
+    tcg_ctxs = g_new(TCGContext *, MAXCPUSHACK);
 #endif
 
     tcg_debug_assert(!tcg_regset_test_reg(s->reserved_regs, TCG_AREG0));

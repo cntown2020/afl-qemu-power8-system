@@ -816,3 +816,4 @@ DEF_HELPER_5(stqcx_be_parallel, i32, env, tl, i64, i64, i32)
 #endif
 
 DEF_HELPER_1(afl, void, env)
+DEF_HELPER_1(aflbb, void, env)

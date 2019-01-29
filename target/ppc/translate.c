@@ -6764,15 +6764,15 @@ static void gen_dform3D(DisasContext *ctx)
 }
 
 
-void helper_afl(CPUPPCState *env) 
-{
-    printf("afl instruction called, pc:" TARGET_FMT_lx ", r0: " TARGET_FMT_lx  "\n",env->nip,env->gpr[0]);
-}
-
 /* handle AFL opcode */
 static void gen_afl(DisasContext *ctx)
 {
     gen_helper_afl(cpu_env);
+}
+
+static void gen_aflbb(DisasContextBase *ctx)
+{
+	gen_helper_aflbb(cpu_env);
 }
 
 static opcode_t opcodes[] = {
@@ -7704,6 +7704,7 @@ static void ppc_tr_init_disas_context(DisasContextBase *dcbase, CPUState *cs)
 
 static void ppc_tr_tb_start(DisasContextBase *db, CPUState *cs)
 {
+    gen_aflbb(db);
 }
 
 static void ppc_tr_insn_start(DisasContextBase *dcbase, CPUState *cs)
@@ -7857,4 +7858,51 @@ void restore_state_to_opc(CPUPPCState *env, TranslationBlock *tb,
                           target_ulong *data)
 {
     env->nip = data[0];
+}
+
+#include "afl.h"
+
+static target_ulong startForkserver(CPUArchState *env, target_ulong enableTicks)
+{
+    printf("pid %d: startForkServer\n", getpid()); fflush(stdout);
+    assert(!afl_fork_child);
+    /*
+     * we're running in a cpu thread. we'll exit the cpu thread
+     * and notify the iothread.  The iothread will run the forkserver
+     * and in the child will restart the cpu thread which will continue
+     * execution.
+     * N.B. We assume a single cpu here!
+     */
+    aflEnableTicks = enableTicks;
+    afl_wants_cpu_to_stop = 1;
+    return 0;
+}
+
+static bool afl_tracing = false;
+
+void helper_afl(CPUPPCState *env) 
+{
+    printf("afl instruction called, pc:" TARGET_FMT_lx ", r3: " TARGET_FMT_lx  "\n",env->nip,env->gpr[3]);
+    switch(env->gpr[3]) {
+        case 0x1:
+            fprintf(stderr, "afl enable tracing\n");
+            afl_tracing = true;
+            break;
+        case 0x2:
+            fprintf(stderr, "afl disable tracing\n");
+            afl_tracing = false;
+            break;
+        case 0x3:
+            fprintf(stderr, "afl forcing fork\n");
+            startForkserver(env,false);
+            break;
+        default:
+            printf("unknown afl instruction " TARGET_FMT_lx "\n",env->gpr[3]);
+    }
+}
+
+void helper_aflbb(CPUPPCState *env) {
+	if(afl_tracing) {
+        fprintf(stderr, "tracing at " TARGET_FMT_lx "\n",env->nip);
+    }
 }

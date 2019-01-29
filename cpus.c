@@ -53,6 +53,8 @@
 #include "hw/nmi.h"
 #include "sysemu/replay.h"
 #include "hw/boards.h"
+//#include "afl.h"
+#include "afl-qemu-cpu-inl.h"
 
 #ifdef CONFIG_LINUX
 
@@ -1452,6 +1454,10 @@ static void deal_with_unplugged_cpus(void)
     }
 }
 
+
+static int afl_qemuloop_pipe[2];        /* to notify mainloop to become forkserver */
+static CPUState *restart_cpu = NULL;    /* cpu to restart */
+
 /* Single-threaded TCG
  *
  * In the single-threaded case each vCPU is simulated in turn. If
@@ -1463,6 +1469,7 @@ static void deal_with_unplugged_cpus(void)
 
 static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
 {
+    fprintf(stderr,"starting tcg_rr\n");
     CPUState *cpu = arg;
 
     assert(tcg_enabled());
@@ -1476,6 +1483,11 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
     cpu->created = true;
     cpu->can_do_io = 1;
     qemu_cond_signal(&qemu_cpu_cond);
+
+    fprintf(stderr, "first cpu: %p\n",first_cpu);
+    fprintf(stderr, "my cpu: %p\n",cpu);
+
+    fprintf(stderr, "thread configured\n");
 
     /* wait for initial kick-off after machine start */
     while (first_cpu->stopped) {
@@ -1491,6 +1503,7 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
     start_tcg_kick_timer();
 
     cpu = first_cpu;
+    current_cpu = cpu;
 
     /* process any pending work */
     cpu->exit_request = 1;
@@ -1568,8 +1581,30 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
 
         qemu_tcg_rr_wait_io_event();
         deal_with_unplugged_cpus();
+
+        if(afl_wants_cpu_to_stop)
+            break;
     }
 
+    if(afl_wants_cpu_to_stop) {
+        printf("AFL stopping CPU thread\n");
+        fflush(stdout);
+        /* tell iothread to run AFL forkserver */
+        afl_wants_cpu_to_stop = 0;
+        if(write(afl_qemuloop_pipe[1], "FORK", 4) != 4)
+            perror("write afl_qemuloop_pip");
+        afl_qemuloop_pipe[1] = -1;
+
+        restart_cpu = first_cpu;
+        cpu_disable_ticks();
+
+        /* let iothread through once ... */
+        qemu_tcg_rr_wait_io_event();
+        sleep(1);
+}
+
+    printf("CPU thread dead. Bye!\n");
+    qemu_mutex_unlock_iothread();
     rcu_unregister_thread();
     return NULL;
 }
@@ -1930,6 +1965,7 @@ void cpu_remove_sync(CPUState *cpu)
 
 /* For temporary buffers for forming a name */
 #define VCPU_THREAD_NAME_SIZE 16
+static bool reboot_thread = false;
 
 static void qemu_tcg_init_vcpu(CPUState *cpu)
 {
@@ -1950,7 +1986,7 @@ static void qemu_tcg_init_vcpu(CPUState *cpu)
         tcg_region_init();
     }
 
-    if (qemu_tcg_mttcg_enabled() || !single_tcg_cpu_thread) {
+    if (qemu_tcg_mttcg_enabled() || !single_tcg_cpu_thread || reboot_thread) {
         cpu->thread = g_malloc0(sizeof(QemuThread));
         cpu->halt_cond = g_malloc0(sizeof(QemuCond));
         qemu_cond_init(cpu->halt_cond);
@@ -2063,9 +2099,16 @@ static void qemu_dummy_start_vcpu(CPUState *cpu)
     qemu_thread_create(cpu->thread, thread_name, qemu_dummy_cpu_thread_fn, cpu,
                        QEMU_THREAD_JOINABLE);
 }
-
+static void
+gotPipeNotification(void *ctx);
 void qemu_init_vcpu(CPUState *cpu)
 {
+    if(pipe(afl_qemuloop_pipe) == -1) {
+        perror("qemuloop pipe");
+        exit(1);
+    }
+    qemu_set_fd_handler(afl_qemuloop_pipe[0], gotPipeNotification, NULL, NULL);
+    
     cpu->nr_cores = smp_cores;
     cpu->nr_threads = smp_threads;
     cpu->stopped = true;
@@ -2469,3 +2512,35 @@ void dump_drift_info(FILE *f, fprintf_function cpu_fprintf)
         cpu_fprintf(f, "Max guest advance   NA\n");
     }
 }
+
+static void
+gotPipeNotification(void *ctx)
+{
+    CPUArchState *env;
+    char buf[4];
+
+    /* cpu thread asked us to run AFL forkserver */
+    if(read(afl_qemuloop_pipe[0], buf, 4) != 4) {
+        printf("error reading afl/qemu pipe!\n");
+        exit(1);
+    }
+
+    printf("start up afl forkserver!\n");
+    afl_setup();
+    env = NULL; //XXX for now.. if we want to share JIT to the parent we will need to pass in a real env here
+    //env = restart_cpu->env_ptr;
+    //afl_forkserver(env);
+    fork();
+
+    /* we're now in the child! */
+    if(aflEnableTicks) // re-enable ticks only if asked to
+        cpu_enable_ticks();
+
+    reboot_thread = true;
+    qemu_tcg_init_vcpu(first_cpu);
+    reboot_thread = false;
+
+//    qemu_clock_warp(QEMU_CLOCK_VIRTUAL);
+    /* continue running iothread in child process... */
+}
+
