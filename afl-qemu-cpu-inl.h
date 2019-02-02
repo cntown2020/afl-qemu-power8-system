@@ -249,7 +249,10 @@ static inline target_ulong aflHash(target_ulong cur_loc)
      Linux systems. */
 
   if (cur_loc > afl_end_code || cur_loc < afl_start_code || !afl_area_ptr)
+  {
+    //printf("%lx > %lx || %lx < %lx || !%p\n",cur_loc,afl_end_code,cur_loc,afl_start_code,afl_area_ptr);
     return 0;
+  }
 
 #ifdef DEBUG_EDGES
   if(1) {
@@ -282,14 +285,15 @@ static inline target_ulong aflHash(target_ulong cur_loc)
   /* Implement probabilistic instrumentation by looking at scrambled block
      address. This keeps the instrumented locations stable across runs. */
 
-  if (h >= afl_inst_rms) return 0;
+  if (h >= afl_inst_rms) {
+    return 0;
+  }
   return h;
 }
 
 /* todo: generate calls to helper_aflMaybeLog during translation */
 static inline void helper_aflMaybeLog(target_ulong cur_loc) {
   static __thread target_ulong prev_loc;
-
   afl_area_ptr[cur_loc ^ prev_loc]++;
   prev_loc = cur_loc >> 1;
 }

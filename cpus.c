@@ -1469,7 +1469,7 @@ static CPUState *restart_cpu = NULL;    /* cpu to restart */
 
 static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
 {
-    fprintf(stderr,"starting tcg_rr\n");
+    //fprintf(stderr,"starting tcg_rr\n");
     CPUState *cpu = arg;
 
     assert(tcg_enabled());
@@ -1484,10 +1484,10 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
     cpu->can_do_io = 1;
     qemu_cond_signal(&qemu_cpu_cond);
 
-    fprintf(stderr, "first cpu: %p\n",first_cpu);
-    fprintf(stderr, "my cpu: %p\n",cpu);
+   // fprintf(stderr, "first cpu: %p\n",first_cpu);
+   // fprintf(stderr, "my cpu: %p\n",cpu);
 
-    fprintf(stderr, "thread configured\n");
+   // fprintf(stderr, "thread configured\n");
 
     /* wait for initial kick-off after machine start */
     while (first_cpu->stopped) {
@@ -1603,7 +1603,7 @@ static void *qemu_tcg_rr_cpu_thread_fn(void *arg)
         sleep(1);
 }
 
-    printf("CPU thread dead. Bye!\n");
+    //printf("CPU thread dead. Bye!\n");
     qemu_mutex_unlock_iothread();
     rcu_unregister_thread();
     return NULL;
@@ -2529,7 +2529,17 @@ gotPipeNotification(void *ctx)
     afl_setup();
     env = NULL; //XXX for now.. if we want to share JIT to the parent we will need to pass in a real env here
     //env = restart_cpu->env_ptr;
-    afl_forkserver(env);
+
+//  tb_flush(first_cpu);
+    if(afl_attached())
+    {
+        afl_forkserver(env);
+    }
+    else {
+        printf("afl not attached; forking for debugging\n");
+        fork();
+        afl_fork_child = 1;
+    }
 
     /* we're now in the child! */
     if(aflEnableTicks) // re-enable ticks only if asked to
@@ -2538,6 +2548,7 @@ gotPipeNotification(void *ctx)
     reboot_thread = true;
     qemu_tcg_init_vcpu(first_cpu);
     reboot_thread = false;
+
 
 //    qemu_clock_warp(QEMU_CLOCK_VIRTUAL);
     /* continue running iothread in child process... */

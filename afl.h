@@ -1,4 +1,8 @@
 #pragma once
+#include <stdlib.h>
+#undef likely
+#undef unlikely
+#include "../../config.h"
 extern const char *aflFile;
 extern unsigned long aflPanicAddr;
 extern unsigned long aflDmesgAddr;
@@ -12,3 +16,8 @@ extern int afl_wants_cpu_to_stop;
 
 void afl_setup(void);
 void afl_forkserver(CPUArchState*);
+
+inline int afl_attached(void) {
+    char *id_str = getenv(SHM_ENV_VAR);
+    return id_str != NULL;
+}

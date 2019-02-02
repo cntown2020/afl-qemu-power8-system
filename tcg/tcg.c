@@ -57,7 +57,8 @@
 # define ELF_DATA   ELFDATA2LSB
 #endif
 
-# define MAXCPUSHACK 4
+#define MAXCPUSHACK 4
+#define CONFIG_USER_ONLY1 1
 
 #include "elf.h"
 #include "exec/log.h"
@@ -584,7 +585,7 @@ void tcg_region_reset_all(void)
     tcg_region_tree_reset_all();
 }
 
-#ifdef CONFIG_USER_ONLY
+#ifdef CONFIG_USER_ONLY1
 static size_t tcg_n_regions(void)
 {
     return 1;
@@ -701,7 +702,7 @@ void tcg_region_init(void)
     tcg_region_trees_init();
 
     /* In user-mode we support only one ctx, so do the initial allocation now */
-#ifdef CONFIG_USER_ONLY
+#ifdef CONFIG_USER_ONLY1
     {
         bool err = tcg_region_initial_alloc__locked(tcg_ctx);
 
@@ -725,7 +726,7 @@ void tcg_region_init(void)
  * Not tracking tcg_init_ctx in tcg_ctxs[] in softmmu keeps code that iterates
  * over the array (e.g. tcg_code_size() the same for both softmmu and user-mode.
  */
-#ifdef CONFIG_USER_ONLY
+#ifdef CONFIG_USER_ONLY1
 void tcg_register_thread(void)
 {
     tcg_ctx = &tcg_init_ctx;
@@ -956,7 +957,7 @@ void tcg_context_init(TCGContext *s)
      * reasoning behind this.
      * In softmmu we will have at most max_cpus TCG threads.
      */
-#ifdef CONFIG_USER_ONLY
+#ifdef CONFIG_USER_ONLY1
     tcg_ctxs = &tcg_ctx;
     n_tcg_ctxs = 1;
 #else

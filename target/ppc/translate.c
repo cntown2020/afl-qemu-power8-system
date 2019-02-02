@@ -7878,8 +7878,6 @@ static target_ulong startForkserver(CPUArchState *env, target_ulong enableTicks)
     return 0;
 }
 
-static bool afl_tracing = false;
-
 static target_ulong getWork(CPUArchState *env, target_ulong ptr, target_ulong sz)
 {
     target_ulong retsz;
@@ -7888,6 +7886,11 @@ static target_ulong getWork(CPUArchState *env, target_ulong ptr, target_ulong sz
 
     //printf("pid %d: getWork %lx %lx\n", getpid(), ptr, sz);fflush(stdout);
     assert(aflStart == 0);
+
+    if(!afl_attached()) {
+        return 0;
+    }
+
     fp = fopen(aflFile, "rb");
     if(!fp) {
          perror(aflFile);
@@ -7915,7 +7918,7 @@ static target_ulong startWork(CPUArchState *env, target_ulong ptr)
     //printf("pid %d: startWork %lx - %lx\n", getpid(), start, end);fflush(stdout);
 
     afl_start_code = 0;
-    afl_end_code   = 0xFFFFFFFFU;
+    afl_end_code   = 0xFFFFFFFFFFFFFFFFU;
     aflGotLog = 0;
     aflStart = 1;
     return 0;
@@ -7923,7 +7926,7 @@ static target_ulong startWork(CPUArchState *env, target_ulong ptr)
 
 void helper_afl(CPUPPCState *env) 
 {
-    printf("afl instruction called, pc:" TARGET_FMT_lx ", r3: " TARGET_FMT_lx  "\n",env->nip,env->gpr[3]);
+    //printf("afl instruction called, pc:" TARGET_FMT_lx ", r3: " TARGET_FMT_lx  "\n",env->nip,env->gpr[3]);
     switch(env->gpr[3]) {
         case 0x1:
             startWork(env, env->gpr[3]);
@@ -7937,6 +7940,9 @@ void helper_afl(CPUPPCState *env)
         case 0x5:
             _exit(0);
             break;
+        case 0x6:
+            env->gpr[3] = afl_fork_child;
+            break;
         default:
             printf("unknown afl instruction " TARGET_FMT_lx "\n",env->gpr[3]);
     }
@@ -7944,5 +7950,6 @@ void helper_afl(CPUPPCState *env)
 
 void helper_aflbb(CPUPPCState *env) {
         afl_maybe_log(env->nip);
-    //    fprintf(stderr, "tracing at " TARGET_FMT_lx "\n",env->nip);
+        /*if(aflStart)
+            fprintf(stderr, "tracing at " TARGET_FMT_lx "\n",env->nip);*/
 }
