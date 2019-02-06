@@ -17,7 +17,7 @@ extern int afl_wants_cpu_to_stop;
 void afl_setup(void);
 void afl_forkserver(CPUArchState*);
 
-inline int afl_attached(void) {
+static inline int afl_attached(void) {
     char *id_str = getenv(SHM_ENV_VAR);
     return id_str != NULL;
 }

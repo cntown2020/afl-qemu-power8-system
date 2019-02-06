@@ -281,7 +281,13 @@ static void spr_write_atbu(DisasContext *ctx, int sprn, int gprn)
 __attribute__ (( unused ))
 static void spr_read_purr(DisasContext *ctx, int gprn, int sprn)
 {
+    if (tb_cflags(ctx->base.tb) & CF_USE_ICOUNT) {
+        gen_io_start();
+    }
     gen_helper_load_purr(cpu_gpr[gprn], cpu_env);
+    if (tb_cflags(ctx->base.tb) & CF_USE_ICOUNT) {
+        gen_io_end();
+    }
 }
 
 /* HDECR */
